@@ -8,9 +8,9 @@ Description: A module that acts as the entry point for running the data pipeline
              regression models under global, country-specific, and global-to-country settings.
 """
 
-from preprocessing import DataIntegrator, WB_INDICATORS, IMF_INDICATORS
-from visualization import plot_gdp_emp_corr, plot_indicator_vs_gdp_emp, plot_countries_gdp_emp, plot_mape_comparison
-from model import train_eval_global_models, train_eval_country_models, train_eval_global_to_country_models
+from src.preprocessing import DataIntegrator, WB_INDICATORS, IMF_INDICATORS
+from src.visualization import plot_gdp_emp_corr, plot_indicator_vs_gdp_emp, plot_countries_gdp_emp, plot_mape_comparison
+from src.model import train_eval_global_models, train_eval_country_models, train_eval_global_to_country_models
 
 REGION_MAP = {
     "USA": "North America", "CAN": "North America", "MEX": "North America",
