@@ -1,0 +1,7 @@
+requests
+pandas
+numpy
+seaborn
+matplotlib
+scikit-learn
+xgboost
