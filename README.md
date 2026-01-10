@@ -86,6 +86,50 @@ The pipeline follows a clear, sequential workflow:
 
 ---
 
+## Results & Visualizations
+
+### Exploratory Data Analysis
+
+**Spearman correlation heatmap** showing relationships between GDP per person employed and selected macroeconomic indicators.
+
+<p align="center">
+  <img src="images/corr_heatmap.png" width="600">
+</p>
+
+**Standardized scatter plot** illustrating the strong positive relationship between GDP per person employed and GDP per capita.
+
+<p align="center">
+  <img src="images/scatter_gdp_pc.png" width="600">
+</p>
+
+<br>
+
+### Labor Productivity Trends Across Regions
+
+Time series of GDP per person employed across selected countries, grouped by region, highlighting regional productivity gaps and long-run trends.
+
+<p align="center">
+  <img src="images/line_trend_region.png" width="600">
+</p>
+
+<br>
+
+### Model Performance Comparison
+
+MAPE comparison between global pooled models and country-specific models.
+
+<p align="center">
+  <img src="images/global_vs_country.png" width="600">
+</p>
+
+Global pooled models evaluated on each country’s holdout set to assess cross-country generalization.
+
+<p align="center">
+  <img src="images/global_to_country.png" width="600">
+</p>
+
+---
+
 ## Acknowledgments
 
 - World Bank Data APIs
