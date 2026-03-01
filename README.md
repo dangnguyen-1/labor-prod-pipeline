@@ -4,7 +4,9 @@
 
 This project builds an end-to-end data pipeline to analyze and predict **GDP per person employed** using macroeconomic indicators from the **World Bank** and **IMF**.  
 
-It integrates data collection, preprocessing, visualization, and machine learning tree-based regression models. The modeling component compares three settings:
+It integrates data collection, preprocessing, lag-based feature engineering, visualization, and machine learning tree-based regression models. 
+All models are evaluated using expanding-window walk-forward cross-validation to ensure time-respecting, out-of-sample performance estimates.
+The modeling component compares three settings:
 
 - **Global pooled models** trained on all countries jointly  
 - **Country-specific models** trained separately for each country  
@@ -78,7 +80,7 @@ The pipeline follows a clear, sequential workflow:
 
 1. Fetch and preprocess macroeconomic indicators from the World Bank and IMF  
 2. Generate exploratory visualizations (correlation heatmaps, scatter plots, time series)  
-3. Train and evaluate machine learning models under three modeling strategies:  
+3. Train and evaluate machine learning models under three modeling strategies using expanding-window walk-forward cross-validation:
    - Global pooled models  
    - Country-specific models  
    - Global pooled models applied to individual countries  
@@ -116,13 +118,13 @@ Time series of GDP per person employed across selected countries, grouped by reg
 
 ### Model Performance Comparison
 
-MAPE comparison between global pooled models and country-specific models.
+Mean Walk-Forward MAPE Comparison between global pooled and country-specific models.
 
 <p align="center">
   <img src="images/global_vs_country.png" width="700">
 </p>
 
-Global pooled models evaluated on each country’s holdout set to assess cross-country generalization.
+Mean Walk-Forward MAPE when global pooled models are applied to individual countries to assess cross-country generalization.
 
 <p align="center">
   <img src="images/global_to_country.png" width="700">
