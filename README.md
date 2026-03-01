@@ -1,4 +1,4 @@
-# Labor Productivity Prediction from Macroeconomic Indicators
+# Labor Productivity Forecasting Pipeline
 
 ## About The Project
 
