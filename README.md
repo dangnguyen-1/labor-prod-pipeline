@@ -6,7 +6,7 @@ This project builds an end-to-end data pipeline to analyze and predict **GDP per
 
 It integrates data collection, preprocessing, lag-based feature engineering, visualization, and tree-based regression models, 
 evaluated using expanding-window walk-forward cross-validation.  
-The modeling component compares three settings:
+The modeling component compares three settings:  
 - **Global pooled models** trained on all countries jointly  
 - **Country-specific models** trained separately for each country  
 - **Global-to-country models**, where global models are evaluated on individual countries to assess cross-country generalization  
