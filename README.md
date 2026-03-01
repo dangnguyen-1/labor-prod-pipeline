@@ -4,8 +4,8 @@
 
 This project builds an end-to-end data pipeline to analyze and predict **GDP per person employed** using macroeconomic indicators from the **World Bank** and **IMF**.  
 
-It integrates data collection, preprocessing, lag-based feature engineering, visualization, and ML tree-based regression models.
-All models are evaluated using expanding-window walk-forward cross-validation to ensure time-respecting, out-of-sample performance estimates.  
+It integrates data collection, preprocessing, lag-based feature engineering, visualization, and machine learning tree-based regression models, 
+evaluated using expanding-window walk-forward cross-validation to ensure time-respecting, out-of-sample performance estimates. 
 The modeling component compares three settings:
 - **Global pooled models** trained on all countries jointly  
 - **Country-specific models** trained separately for each country  
