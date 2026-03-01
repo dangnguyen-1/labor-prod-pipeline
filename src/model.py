@@ -1,14 +1,12 @@
 """
 Filename: model.py
-Author: Dang Nguyen
 Description: A module for training and evaluating global and country-specific tree-based regression models
-             to predict GDP per person employed using lagged macroeconomic indicators, including
-             global pooled models, country-specific models, and global-to-country models.
+             to predict GDP per person employed using lagged macroeconomic indicators. It implements expanding-window
+             walk-forward cross-validation for global pooled, country-specific, and global-to-country evaluation settings.
 """
 
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
 from xgboost import XGBRegressor
-from sklearn.model_selection import train_test_split
 from sklearn.metrics import r2_score
 import numpy as np
 
@@ -37,6 +35,32 @@ def make_lagged_features(df, lags = 1):
     df_lagged = df_lagged.dropna(subset = feature_cols + [f"{target} (t-{lags})", target])
 
     return df_lagged
+
+
+def expanding_year_folds(df, min_train_years = 20, test_years = 3, step = 1):
+    """
+    Parameters: df - a DataFrame containing macroeconomic indicator data
+                min_train_years - minimum number of years used for the initial training period
+                test_years - number of future years included in each test fold
+                step - number of years the window advances after each fold
+    Returns: a List
+    Does: generates expanding-window walk-forward cross-validation folds
+          based on unique years, where training uses past years and testing
+          uses the next block of future years
+    """
+    years = sorted(df["Year"].unique())
+    folds = []
+
+    for i in range(min_train_years, len(years) - test_years + 1, step):
+        train_years = years[:i]
+        test_years_block = years[i:i + test_years]
+
+        train_mask = df["Year"].isin(train_years)
+        test_mask = df["Year"].isin(test_years_block)
+
+        folds.append((train_mask, test_mask))
+
+    return folds
 
 
 def compute_perf_metrics(y_test_log, y_pred_log):
@@ -72,113 +96,169 @@ def fit_models(X_train, y_train):
     return trained_models
 
 
-def train_eval_global_models(df):
+def train_eval_global_models(df, min_train_years = 20, test_years = 3, step = 1):
     """
     Parameters: df - a DataFrame containing macroeconomic indicator data
+                min_train_years - minimum number of years used for the initial training period
+                test_years - number of future years included in each test fold
+                step - number of years the window advances after each fold
     Returns: a dictionary
-    Does: trains predefined models on pooled global data using lagged features
-          to predict GDP per person employed and evaluates their performance on test data
-          with a year-based (time-respecting) split
+    Does: trains predefined models on pooled global data using lagged features and evaluates their performance
+          using expanding-window walk-forward cross-validation, averaging out-of-sample metrics across folds
     """
     df = df.dropna()
-    df = make_lagged_features(df, lags = 1)
-    df = df.sort_values("Year").reset_index(drop = True)
+    df = make_lagged_features(df, lags=1)
+    df = df.sort_values(["Year", "Country"]).reset_index(drop=True)
 
     target = "GDP Per Person Employed (2021 PPP $)"
 
-    years = sorted(df["Year"].unique())
-    cutoff_year = years[int(0.8 * len(years))]
+    X_all = df.drop(columns = ["Country", "Year", target])
+    y_all = np.log1p(df[target])
 
-    train_df = df[df["Year"] <= cutoff_year]
-    test_df = df[df["Year"] > cutoff_year]
+    folds = expanding_year_folds(df, min_train_years = min_train_years,
+                                 test_years = test_years, step = step)
 
-    X_train = train_df.drop(columns = ["Country", "Year", target])
-    y_train = np.log1p(train_df[target])
+    per_model_metrics = {name: [] for name in MODELS}
 
-    X_test = test_df.drop(columns = ["Country", "Year", target])
-    y_test = np.log1p(test_df[target])
-
-    trained = fit_models(X_train, y_train)
-
-    results = {}
-    for name, model in trained.items():
-        y_pred_log = model.predict(X_test)
-        results[name] = compute_perf_metrics(y_test, y_pred_log)
-
-    return results
-
-
-def train_eval_country_models(df, min_years = 25):
-    """
-    Parameters: df - lagged macroeconomic DataFrame (must include Country, Year)
-                min_years - minimum number of observations required per country after lagging
-    Returns: a nested dictionary
-    Does: trains separate predefined models for each eligible country data using lagged features
-          to predict GDP per person employed and evaluates their performance on test data
-          with a year-based (time-respecting) split
-    """
-    df = df.dropna()
-    df = make_lagged_features(df, lags = 1)
-
-    results = {}
-    counts = df["Country"].value_counts()
-    eligible_countries = counts[counts >= min_years].index.tolist()
-
-    for country in eligible_countries:
-        country_df = df[df["Country"] == country].sort_values("Year")
-
-        X = country_df.drop(columns = ["Country", "Year", "GDP Per Person Employed (2021 PPP $)"])
-        y = np.log1p(country_df["GDP Per Person Employed (2021 PPP $)"])
-
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.2, shuffle = False)
+    for train_mask, test_mask in folds:
+        X_train = X_all[train_mask]
+        y_train = y_all[train_mask]
+        X_test = X_all[test_mask]
+        y_test = y_all[test_mask]
 
         trained = fit_models(X_train, y_train)
 
-        results[country] = {}
         for name, model in trained.items():
             y_pred_log = model.predict(X_test)
-            results[country][name] = {**compute_perf_metrics(y_test, y_pred_log), "N": len(country_df)}
+            per_model_metrics[name].append(compute_perf_metrics(y_test, y_pred_log))
+
+    results = {}
+    for name, metrics_list in per_model_metrics.items():
+        r2_vals = [m["R2"] for m in metrics_list]
+        mape_vals = [m["MAPE (%)"] for m in metrics_list]
+
+        results[name] = {
+            "R2": float(np.mean(r2_vals)),
+            "MAPE (%)": float(np.mean(mape_vals)),
+            "Folds": len(metrics_list)
+        }
 
     return results
 
 
-def train_eval_global_to_country_models(df, min_years = 25):
+def train_eval_country_models(df, min_years = 25, min_train_years = 15, test_years = 3, step = 1):
     """
     Parameters: df - a DataFrame containing macroeconomic indicator data
-                min_years - minimum number of observations required per country after lagging
-    Returns: nested dictionary
-    Does: trains predefined models on pooled global data once using lagged features and
-          evaluates those same trained models on each eligible country's time-respecting
-          holdout set to assess cross-country generalization performance
+                min_train_years - minimum number of years used for the initial training period
+                test_years - number of future years included in each test fold
+                step - number of years the window advances after each fold
+    Returns: a dictionary
+    Does: trains separate predefined models for each eligible country using lagged features and evaluates performance
+          with expanding-window walk-forward cross-validation within each country, averaging metrics across folds
     """
     df = df.dropna()
     df = make_lagged_features(df, lags = 1)
-    df = df.sort_values("Year").reset_index(drop = True)
 
-    X_all = df.drop(columns = ["Country", "Year", "GDP Per Person Employed (2021 PPP $)"])
-    y_all = np.log1p(df["GDP Per Person Employed (2021 PPP $)"])
-
-    X_train_all, X_test_all, y_train_all, y_test_all = train_test_split(X_all, y_all,
-                                                                        test_size = 0.2, shuffle = False)
-
-    trained_global = fit_models(X_train_all, y_train_all)
+    target = "GDP Per Person Employed (2021 PPP $)"
 
     results = {}
     counts = df["Country"].value_counts()
     eligible_countries = counts[counts >= min_years].index.tolist()
 
     for country in eligible_countries:
-        country_df = df[df["Country"] == country].sort_values("Year")
+        country_df = df[df["Country"] == country].sort_values("Year").reset_index(drop = True)
 
-        X_c = country_df.drop(columns = ["Country", "Year", "GDP Per Person Employed (2021 PPP $)"])
-        y_c = np.log1p(country_df["GDP Per Person Employed (2021 PPP $)"])
+        X = country_df.drop(columns=["Country", "Year", target])
+        y = np.log1p(country_df[target])
 
-        X_train_c, X_test_c, y_train_c, y_test_c = train_test_split(X_c, y_c,
-                                                                    test_size = 0.2, shuffle = False)
+        folds = expanding_year_folds(country_df, min_train_years = min_train_years,
+                                     test_years = test_years, step = step)
+
+        per_model_metrics = {name: [] for name in MODELS}
+
+        for train_mask, test_mask in folds:
+            X_train = X[train_mask]
+            y_train = y[train_mask]
+            X_test = X[test_mask]
+            y_test = y[test_mask]
+
+            trained = fit_models(X_train, y_train)
+
+            for name, model in trained.items():
+                y_pred_log = model.predict(X_test)
+                per_model_metrics[name].append(compute_perf_metrics(y_test, y_pred_log))
 
         results[country] = {}
-        for name, model in trained_global.items():
-            y_pred_log = model.predict(X_test_c)
-            results[country][name] = {**compute_perf_metrics(y_test_c, y_pred_log), "N": len(country_df)}
+        for name, metrics_list in per_model_metrics.items():
+            r2_vals = [m["R2"] for m in metrics_list]
+            mape_vals = [m["MAPE (%)"] for m in metrics_list]
+
+            results[country][name] = {
+                "R2": float(np.mean(r2_vals)) if metrics_list else np.nan,
+                "MAPE (%)": float(np.mean(mape_vals)) if metrics_list else np.nan,
+                "Folds": len(metrics_list),
+                "N": len(country_df)
+            }
+
+    return results
+
+
+def train_eval_global_to_country_models(df, min_years = 25, min_train_years = 20, test_years = 3, step = 1):
+    """
+    Parameters: df - a DataFrame containing macroeconomic indicator data
+                min_years - minimum number of usable observations required for a country
+                min_train_years - minimum number of years used for the initial training period
+                test_years - number of future years included in each test fold
+                step - number of years the window advances after each fold
+    Returns: a dictionary
+    Does: trains predefined models on pooled global data within each expanding-window fold and
+          evaluates those models on each eligible country’s future observations in the same fold
+          to assess cross-country generalization performance, averaging results across folds
+    """
+    df = df.dropna()
+    df = make_lagged_features(df, lags = 1)
+    df = df.sort_values(["Year", "Country"]).reset_index(drop = True)
+
+    target = "GDP Per Person Employed (2021 PPP $)"
+
+    feature_cols = [c for c in df.columns if c not in ["Country", "Year", target]]
+    counts = df["Country"].value_counts()
+    eligible_countries = counts[counts >= min_years].index.tolist()
+
+    folds = expanding_year_folds(df, min_train_years = min_train_years,
+                                 test_years = test_years, step = step)
+
+    per_country = {c: {m: [] for m in MODELS} for c in eligible_countries}
+
+    for train_mask, test_mask in folds:
+        train_df = df[train_mask]
+        test_df = df[test_mask]
+        X_train = train_df[feature_cols]
+        y_train = np.log1p(train_df[target])
+
+        trained_global = fit_models(X_train, y_train)
+
+        for country in eligible_countries:
+            country_test = test_df[test_df["Country"] == country]
+            if country_test.empty:
+                continue
+
+            X_ct = country_test[feature_cols]
+            y_ct = np.log1p(country_test[target])
+
+            for name, model in trained_global.items():
+                y_pred_log = model.predict(X_ct)
+                per_country[country][name].append(compute_perf_metrics(y_ct, y_pred_log))
+
+    results = {}
+    for country in eligible_countries:
+        results[country] = {}
+        for model_name, ms in per_country[country].items():
+            results[country][model_name] = {
+                "R2": float(np.mean([m["R2"] for m in ms])) if ms else np.nan,
+                "MAPE (%)": float(np.mean([m["MAPE (%)"] for m in ms])) if ms else np.nan,
+                "Folds": len(ms),
+                "N": int(counts[country])
+            }
 
     return results

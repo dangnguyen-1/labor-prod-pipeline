@@ -1,6 +1,5 @@
 """
 Filename: preprocessing.py
-Author: Dang Nguyen
 Description: A module for fetching and preprocessing macroeconomic indicators from the World Bank
              and IMF APIs, interpolating missing values, and integrating the data into a single
              DataFrame for further analysis.

@@ -1,6 +1,5 @@
 """
 Filename: visualization.py
-Author: Dang Nguyen
 Description: A module that provides visualization tools to explore the relationship between
              GDP per person employed and various macroeconomic indicators. It includes functions
              for generating correlation heatmaps, standardized scatter plots, time series
@@ -122,8 +121,8 @@ def plot_mape_comparison(country_results, global_results, country_order, title):
                 country_order = a list specifying the country order for the x-axis
                 title - title of the chart
     Returns: none
-    Does: plots and displays a grouped bar chart comparing MAPE between global pooled models
-          and per-country models
+    Does: plots and displays a grouped bar chart comparing average MAPE across folds
+          between global pooled models and per-country models
     """
     countries = [c for c in country_order if c in country_results]
     labels = ["Global"] + countries

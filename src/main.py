@@ -1,11 +1,9 @@
 """
 Filename: main.py
-Author: Dang Nguyen
-Description: A module that acts as the entry point for running the data pipeline and controls
-             the workflow for analyzing the relationship between macroeconomic indicators and
-             GDP per person employed. It loads and filters data from the World Bank and IMF APIs,
-             visualizes key patterns and correlations, and trains and evaluates tree-based
-             regression models under global, country-specific, and global-to-country settings.
+Description: A module that serves as the entry point for running the full data pipeline.
+             It loads and filters macroeconomic indicator data from the World Bank and IMF APIs,
+             visualizes key relationships, and trains and evaluates tree-based regression models under global,
+             country-specific, and global-to-country settings using expanding-window walk-forward cross-validation.
 """
 
 from src.preprocessing import DataIntegrator, WB_INDICATORS, IMF_INDICATORS
@@ -40,21 +38,27 @@ def main():
 
     # Train and evaluate global pooled models using all countries jointly
     # and country-specific models for countries with sufficient data
-    global_results = train_eval_global_models(indicators_df)
-    country_results = train_eval_country_models(indicators_df, min_years = 25)
+    global_results = train_eval_global_models(indicators_df, min_train_years = 20,
+                                                               test_years = 3, step = 1)
+    country_results = train_eval_country_models(indicators_df, min_years = 25,
+                                                min_train_years = 15, test_years = 3, step = 1)
 
     # Train global pooled models and evaluate when applied to individual countries
-    global_to_country_results = train_eval_global_to_country_models(indicators_df, min_years = 25)
+    global_to_country_results = train_eval_global_to_country_models(indicators_df, min_years = 25,
+                                                                    min_train_years = 20,
+                                                                    test_years = 3, step = 1)
 
     country_order = sorted(country_results.keys())
 
-    # Visualize and compare global vs country-specific models’ prediction accuracy using MAPE
+    # Visualize and compare global vs country-specific models’ prediction accuracy
+    # using mean walk-forward MAPE
     plot_mape_comparison(country_results, global_results, country_order = country_order,
-                         title = "MAPE Comparison: Global vs Country-Specific Models")
+                         title = "Mean Walk-Forward MAPE: Global vs Country-Specific Models")
 
-    # Visualize and compare prediction accuracy for global models applied to individual countries using MAPE
+    # Visualize and compare prediction accuracy for global models applied to individual countries
+    # using mean walk-forward MAPE
     plot_mape_comparison(country_results = global_to_country_results, global_results = global_results, country_order = country_order,
-                         title = "MAPE Comparison: Global Models Applied to Individual Countries")
+                         title = "Mean Walk-Forward MAPE: Global Models Applied to Individual Countries")
 
 
 if __name__ == "__main__":
